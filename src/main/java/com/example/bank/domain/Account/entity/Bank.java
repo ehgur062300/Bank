@@ -12,15 +12,13 @@ public class Bank {
 
     HashMap<Long, Wallet> bank = new HashMap<>();
 
-    public Wallet save(Long id) throws InterruptedException {
-        Thread.sleep((long) (random() * 300L + 100));
+    public Wallet save(Long id) {
         Wallet newWallet = new Wallet(0, LocalDateTime.now());
         bank.put(id, newWallet);
         return newWallet;
     }
 
-    public Wallet findById(Long id) throws InterruptedException {
-        Thread.sleep((long) (random() * 100L + 100));
+    public Wallet findById(Long id) {
         return bank.getOrDefault(id, null);
     }
 

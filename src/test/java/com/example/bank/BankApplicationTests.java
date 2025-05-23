@@ -9,8 +9,18 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.client.HttpClientErrorException;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 
 @SpringBootTest
 class BankApplicationTests {
@@ -44,9 +54,38 @@ class BankApplicationTests {
     }
 
     @Test
-    void 한명에게_동시에_입금요청이_올_경우_실패_테스트() {
-        log.info("동시 입금 요청 실페 테스트 시작");
+    void 한명에게_동시에_입금요청이_올_경우_실패_테스트() throws InterruptedException {
+        log.info("동시 입금 요청 실패 테스트 시작");
+        ExecutorService executor = Executors.newFixedThreadPool(10);
+        List<Throwable> exceptions = Collections.synchronizedList(new ArrayList<>());
 
+        Long id = 1L;
+        int creditAmount = 1000;
+        int cnt = 10;
+        CountDownLatch countDownLatch = new CountDownLatch(cnt);
+        Wallet newWallet = walletService.createAccount(id);
+
+        for (int i = 0; i < cnt; i++) {
+            executor.submit(() -> {
+                try {
+                    walletService.credit(id, creditAmount);
+                } catch (Exception e) {
+                    exceptions.add(e);
+                    log.info("입금 실패: {}", e.getMessage());
+                } finally {
+                    countDownLatch.countDown();
+                }
+            });
+        }
+        countDownLatch.await();
+        executor.shutdown();
+
+        for (Throwable e : exceptions) {
+            assertInstanceOf(HttpClientErrorException.class, e);
+            assertEquals(((HttpClientErrorException) e).getStatusCode(), HttpStatus.CONFLICT);
+        }
+
+        log.info("동시 입금 실패 테스트 완료 / 현재 잔액: {}", newWallet.getBalance());
     }
 
 }
